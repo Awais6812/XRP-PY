@@ -1,171 +1,54 @@
-<<<<<<< HEAD
 import streamlit as st
 import yfinance as yf
 import pandas as pd
-from sklearn.ensemble import RandomForestRegressor
+import numpy as np
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import mean_squared_error
+from sklearn.linear_model import LinearRegression
 import matplotlib.pyplot as plt
-from datetime import datetime, timedelta
 
-st.set_page_config(page_title="XRP Price Predictor", layout="wide")
-st.title("📈 XRP Price Prediction App")
+# Fetch FET/USDT (or FET/USD) data from Yahoo Finance
+fet_data = yf.download('FET-USD', start='2021-01-01', end='2025-01-01')
 
-# Sidebar Inputs
-st.sidebar.header("Model Settings")
-start_date = st.sidebar.date_input("Start Date", value=pd.to_datetime("2020-01-01"))
-end_date = st.sidebar.date_input("End Date", value=pd.to_datetime("2024-12-31"))
+# Fetch USD/PKR exchange rate (from USD to PKR)
+usd_pkr_data = yf.download('USDKRW=X', start='2021-01-01', end='2025-01-01')  # Use USDKRW=X for USD/PKR
 
-# Fetch Data
-@st.cache_data
+# Rescale FET to PKR (multiply FET-USD by USD-PKR)
+fet_data['Close_PKR'] = fet_data['Close'] * usd_pkr_data['Close']
 
-def load_data():
-    df = yf.download("XRP-USD", start=start_date, end=end_date)
-    df['Return'] = df['Close'].pct_change()
-    df['MA7'] = df['Close'].rolling(window=7).mean()
-    df['MA21'] = df['Close'].rolling(window=21).mean()
-    df['Volatility'] = df['Return'].rolling(window=7).std()
-    df.dropna(inplace=True)
-    return df
+# Data Preprocessing
+fet_data['Price'] = fet_data['Close_PKR']
+fet_data['Price_Change'] = fet_data['Price'].pct_change()
 
-xrp = load_data()
-st.subheader("📊 Historical XRP Data")
-st.dataframe(xrp.tail(10))
+# Drop NaN values from the data
+fet_data = fet_data.dropna()
 
-# Feature Selection
-features = ['MA7', 'MA21', 'Volatility', 'Volume']
-X = xrp[features]
-y = xrp['Close'].shift(-1)
+# Train a basic linear regression model
+X = fet_data[['Close_PKR']].shift(1).dropna()  # Lag the data to predict future
+y = fet_data['Price'].iloc[1:]  # Predict the next day's price
 
-X_train, X_test, y_train, y_test = train_test_split(X[:-1], y[:-1], test_size=0.2, shuffle=False)
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
-# Model Training
-model = RandomForestRegressor(n_estimators=100, random_state=42)
+# Train the model
+model = LinearRegression()
 model.fit(X_train, y_train)
-y_pred = model.predict(X_test)
-mse = mean_squared_error(y_test, y_pred)
 
-st.subheader("📈 Model Performance")
-st.write(f"Mean Squared Error (MSE): {mse:.4f}")
+# Predictions
+fet_data['Predicted_Close'] = model.predict(X)
 
-# Prediction
-xrp['Predicted_Close'] = model.predict(X)
+# Trading Signal
+fet_data['Signal'] = fet_data['Predicted_Close'] > fet_data['Price']
 
-# Visualization
-st.subheader("📉 Actual vs Predicted Close Price")
-fig, ax = plt.subplots(figsize=(14,6))
-ax.plot(xrp['Close'], label='Actual')
-ax.plot(xrp['Predicted_Close'], label='Predicted')
+# Display Results
+st.subheader("💡 FET/PKR Price Prediction & Trading Signal")
+st.dataframe(fet_data[['Price', 'Predicted_Close', 'Signal']].tail(10))
+
+# Plot the results
+fig, ax = plt.subplots(figsize=(10, 6))
+ax.plot(fet_data.index, fet_data['Price'], label="Actual FET/PKR Price", color='blue')
+ax.plot(fet_data.index, fet_data['Predicted_Close'], label="Predicted FET/PKR Price", color='orange')
+ax.set_xlabel('Date')
+ax.set_ylabel('Price (PKR)')
+ax.set_title('FET/PKR Price Prediction')
 ax.legend()
 st.pyplot(fig)
 
-# Trading Signal
-xrp['Signal'] = xrp['Predicted_Close'] > xrp['Close']
-st.subheader("💡 Buy Signal (True = Buy, False = Hold/Sell)")
-st.dataframe(xrp[['Close', 'Predicted_Close', 'Signal']].tail(10))
-
-# Real-Time Signal
-st.subheader("🚨 Real-Time Trading Signal")
-
-today = datetime.today().strftime('%Y-%m-%d')
-yesterday = (datetime.today() - timedelta(days=2)).strftime('%Y-%m-%d')
-latest_data = yf.download("XRP-USD", start=yesterday, end=today)
-
-if not latest_data.empty:
-    latest_close = latest_data['Close'][-1]
-    latest_input = xrp[features].iloc[-1:].copy()
-    latest_prediction = model.predict(latest_input)[0]
-
-    signal = "BUY" if latest_prediction > latest_close else "HOLD/SELL"
-
-    st.metric(label="Current XRP Price", value=f"${latest_close:.4f}")
-    st.metric(label="Predicted Next Close", value=f"${latest_prediction:.4f}")
-    st.markdown(f"### ✅ Suggested Action: **{signal}**")
-else:
-    st.warning("Could not fetch latest data. Try again later.")
-=======
-import streamlit as st
-import yfinance as yf
-import pandas as pd
-from sklearn.ensemble import RandomForestRegressor
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import mean_squared_error
-import matplotlib.pyplot as plt
-from datetime import datetime, timedelta
-
-st.set_page_config(page_title="XRP Price Predictor", layout="wide")
-st.title("📈 XRP Price Prediction App")
-
-# Sidebar Inputs
-st.sidebar.header("Model Settings")
-start_date = st.sidebar.date_input("Start Date", value=pd.to_datetime("2020-01-01"))
-end_date = st.sidebar.date_input("End Date", value=pd.to_datetime("2024-12-31"))
-
-# Fetch Data
-@st.cache_data
-
-def load_data():
-    df = yf.download("XRP-USD", start=start_date, end=end_date)
-    df['Return'] = df['Close'].pct_change()
-    df['MA7'] = df['Close'].rolling(window=7).mean()
-    df['MA21'] = df['Close'].rolling(window=21).mean()
-    df['Volatility'] = df['Return'].rolling(window=7).std()
-    df.dropna(inplace=True)
-    return df
-
-xrp = load_data()
-st.subheader("📊 Historical XRP Data")
-st.dataframe(xrp.tail(10))
-
-# Feature Selection
-features = ['MA7', 'MA21', 'Volatility', 'Volume']
-X = xrp[features]
-y = xrp['Close'].shift(-1)
-
-X_train, X_test, y_train, y_test = train_test_split(X[:-1], y[:-1], test_size=0.2, shuffle=False)
-
-# Model Training
-model = RandomForestRegressor(n_estimators=100, random_state=42)
-model.fit(X_train, y_train)
-y_pred = model.predict(X_test)
-mse = mean_squared_error(y_test, y_pred)
-
-st.subheader("📈 Model Performance")
-st.write(f"Mean Squared Error (MSE): {mse:.4f}")
-
-# Prediction
-xrp['Predicted_Close'] = model.predict(X)
-
-# Visualization
-st.subheader("📉 Actual vs Predicted Close Price")
-fig, ax = plt.subplots(figsize=(14,6))
-ax.plot(xrp['Close'], label='Actual')
-ax.plot(xrp['Predicted_Close'], label='Predicted')
-ax.legend()
-st.pyplot(fig)
-
-# Trading Signal
-xrp['Signal'] = xrp['Predicted_Close'] > xrp['Close']
-st.subheader("💡 Buy Signal (True = Buy, False = Hold/Sell)")
-st.dataframe(xrp[['Close', 'Predicted_Close', 'Signal']].tail(10))
-
-# Real-Time Signal
-st.subheader("🚨 Real-Time Trading Signal")
-
-today = datetime.today().strftime('%Y-%m-%d')
-yesterday = (datetime.today() - timedelta(days=2)).strftime('%Y-%m-%d')
-latest_data = yf.download("XRP-USD", start=yesterday, end=today)
-
-if not latest_data.empty:
-    latest_close = latest_data['Close'][-1]
-    latest_input = xrp[features].iloc[-1:].copy()
-    latest_prediction = model.predict(latest_input)[0]
-
-    signal = "BUY" if latest_prediction > latest_close else "HOLD/SELL"
-
-    st.metric(label="Current XRP Price", value=f"${latest_close:.4f}")
-    st.metric(label="Predicted Next Close", value=f"${latest_prediction:.4f}")
-    st.markdown(f"### ✅ Suggested Action: **{signal}**")
-else:
-    st.warning("Could not fetch latest data. Try again later.")
->>>>>>> 0eed575e7fab532fa696a2d5a7e76e256c23cd12
