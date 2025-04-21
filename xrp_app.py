@@ -51,4 +51,3 @@ ax.set_ylabel('Price (PKR)')
 ax.set_title('FET/PKR Price Prediction')
 ax.legend()
 st.pyplot(fig)
-
