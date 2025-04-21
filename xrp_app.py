@@ -12,6 +12,10 @@ fet_data = yf.download('FET-USD', start='2021-01-01', end='2025-01-01')
 # Fetch USD/PKR exchange rate (from USD to PKR)
 usd_pkr_data = yf.download('USDKRW=X', start='2021-01-01', end='2025-01-01')  # Use USDKRW=X for USD/PKR
 
+# Ensure that both 'Close' columns align
+fet_data = fet_data[['Close']]  # Only use 'Close' price from FET data
+usd_pkr_data = usd_pkr_data[['Close']]  # Only use 'Close' price from USD/PKR data
+
 # Rescale FET to PKR (multiply FET-USD by USD-PKR)
 fet_data['Close_PKR'] = fet_data['Close'] * usd_pkr_data['Close']
 
