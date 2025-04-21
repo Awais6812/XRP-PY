@@ -31,4 +31,35 @@ combined_data.dropna(inplace=True)
 
 # Prepare features and target
 X = combined_data[['Close_PKR']].shift(1).dropna()
-y = combined_data['Price'].iloc[1_
+y = combined_data['Price'].iloc[1:]
+
+# Align shapes
+X = X.loc[y.index]
+
+# Train-test split
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+# Train the model
+model = LinearRegression()
+model.fit(X_train, y_train)
+
+# Predict
+y_pred = model.predict(X_test)
+
+# Show performance
+mse = mean_squared_error(y_test, y_pred)
+st.write(f"Mean Squared Error: {mse:.4f}")
+
+# Plot predictions vs actual
+fig, ax = plt.subplots()
+ax.plot(y_test.index, y_test, label='Actual')
+ax.plot(y_test.index, y_pred, label='Predicted')
+ax.set_title('FET/PKR Price Prediction')
+ax.legend()
+st.pyplot(fig)
+
+# Optional: Show latest prediction
+latest_price = combined_data['Close_PKR'].iloc[-1]
+predicted_next = model.predict([[latest_price]])[0]
+st.write(f"Latest FET/PKR price: {latest_price:.2f}")
+st.write(f"Predicted next value: {predicted_next:.2f}")
