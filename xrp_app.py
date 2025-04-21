@@ -6,50 +6,53 @@ from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LinearRegression
 import matplotlib.pyplot as plt
 
-# Fetch FET/USDT (or FET/USD) data from Yahoo Finance
-fet_data = yf.download('FET-USD', start='2021-01-01', end='2025-01-01')
+# Load data
+fet_data = yf.download('FET-USD', start='2021-01-01', end='2025-01-01')[['Close']]
+usd_pkr_data = yf.download('USDPKR=X', start='2021-01-01', end='2025-01-01')[['Close']]
 
-# Fetch USD/PKR exchange rate (from USD to PKR)
-usd_pkr_data = yf.download('USDKRW=X', start='2021-01-01', end='2025-01-01')  # Use USDKRW=X for USD/PKR
+# Rename columns for clarity
+fet_data.rename(columns={"Close": "FET_Close_USD"}, inplace=True)
+usd_pkr_data.rename(columns={"Close": "USD_to_PKR"}, inplace=True)
 
-# Ensure that both 'Close' columns align
-fet_data = fet_data[['Close']]  # Only use 'Close' price from FET data
-usd_pkr_data = usd_pkr_data[['Close']]  # Only use 'Close' price from USD/PKR data
+# Align both dataframes on common dates
+combined_data = fet_data.join(usd_pkr_data, how='inner')
 
-# Rescale FET to PKR (multiply FET-USD by USD-PKR)
-fet_data['Close_PKR'] = fet_data['Close'] * usd_pkr_data['Close']
+# Calculate FET price in PKR
+combined_data['Close_PKR'] = combined_data['FET_Close_USD'] * combined_data['USD_to_PKR']
+combined_data['Price'] = combined_data['Close_PKR']
+combined_data['Price_Change'] = combined_data['Price'].pct_change()
 
-# Data Preprocessing
-fet_data['Price'] = fet_data['Close_PKR']
-fet_data['Price_Change'] = fet_data['Price'].pct_change()
+# Drop NA values
+combined_data.dropna(inplace=True)
 
-# Drop NaN values from the data
-fet_data = fet_data.dropna()
+# Lagged data for prediction
+combined_data['Lag_Close'] = combined_data['Close_PKR'].shift(1)
+combined_data.dropna(inplace=True)
 
-# Train a basic linear regression model
-X = fet_data[['Close_PKR']].shift(1).dropna()  # Lag the data to predict future
-y = fet_data['Price'].iloc[1:]  # Predict the next day's price
+X = combined_data[['Lag_Close']]
+y = combined_data['Price']
 
+# Train/test split
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
-# Train the model
+# Model training
 model = LinearRegression()
 model.fit(X_train, y_train)
 
-# Predictions
-fet_data['Predicted_Close'] = model.predict(X)
+# Make predictions
+combined_data['Predicted_Close'] = model.predict(X)
 
-# Trading Signal
-fet_data['Signal'] = fet_data['Predicted_Close'] > fet_data['Price']
+# Trading signal
+combined_data['Signal'] = combined_data['Predicted_Close'] > combined_data['Price']
 
-# Display Results
+# Display results
 st.subheader("💡 FET/PKR Price Prediction & Trading Signal")
-st.dataframe(fet_data[['Price', 'Predicted_Close', 'Signal']].tail(10))
+st.dataframe(combined_data[['Price', 'Predicted_Close', 'Signal']].tail(10))
 
-# Plot the results
+# Plotting
 fig, ax = plt.subplots(figsize=(10, 6))
-ax.plot(fet_data.index, fet_data['Price'], label="Actual FET/PKR Price", color='blue')
-ax.plot(fet_data.index, fet_data['Predicted_Close'], label="Predicted FET/PKR Price", color='orange')
+ax.plot(combined_data.index, combined_data['Price'], label="Actual FET/PKR Price", color='blue')
+ax.plot(combined_data.index, combined_data['Predicted_Close'], label="Predicted FET/PKR Price", color='orange')
 ax.set_xlabel('Date')
 ax.set_ylabel('Price (PKR)')
 ax.set_title('FET/PKR Price Prediction')
