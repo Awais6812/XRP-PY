@@ -21,7 +21,12 @@ usd_pkr_data.rename(columns={"Close": "USD_to_PKR"}, inplace=True)
 combined_data = fet_data.join(usd_pkr_data, how='inner')
 
 # Calculate FET price in PKR
-combined_data['Close_PKR'] = combined_data['FET_Close_USD'] * combined_data['USD_to_PKR']
+combined_data['Close_PKR'] = combined_data['FET_Close_USD'].squeeze() * combined_data['USD_to_PKR'].squeeze()
+combined_data['Price'] = combined_data['Close_PKR']
+combined_data['Price_Change'] = combined_data['Price'].pct_change()
+
+# Multiply safely
+combined_data['Close_PKR'] = fet_series * usd_series
 combined_data['Price'] = combined_data['Close_PKR']
 combined_data['Price_Change'] = combined_data['Price'].pct_change()
 
